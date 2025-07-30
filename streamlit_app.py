@@ -9,6 +9,15 @@ from datetime import datetime
 st.set_page_config(page_title="Aggregator Prime", layout="centered")
 st.sidebar.title("🔀 Mode Selection")
 mode = st.sidebar.radio("Choose Mode", ["📄 Single Report", "📚 Batch Reports"])
+# ✅ Always initialize session state variables early
+if "batch_reports" not in st.session_state:
+    st.session_state.batch_reports = []
+
+if "generated_files" not in st.session_state:
+    st.session_state.generated_files = []
+
+if "zip_path" not in st.session_state:
+    st.session_state.zip_path = None
 
 # -------------------- UTILITY FUNCTIONS --------------------
 def find_pages_with_names(pdf_path, names):
