@@ -2,14 +2,16 @@ import streamlit as st
 import pdfplumber
 import PyPDF2
 import tempfile
+import zipfile
+import os
+from datetime import datetime
 
+# -------------------- Streamlit Config --------------------
 st.set_page_config(page_title="Aggregator Prime", layout="centered")
-
 st.sidebar.title("🔀 Mode Selection")
 mode = st.sidebar.radio("Choose Mode", ["📄 Single Report", "📚 Batch Reports"])
 
-# --- FUNCTIONS ---
-
+# -------------------- Utility Functions --------------------
 def find_pages_with_names(pdf_path, names):
     pages_with_names = set()
     with pdfplumber.open(pdf_path) as pdf:
@@ -28,8 +30,7 @@ def create_pdf_with_pages(source_pdf_path, pages, output_pdf_path):
     with open(output_pdf_path, 'wb') as out_pdf:
         pdf_writer.write(out_pdf)
 
-# --- SINGLE REPORT MODE ---
-
+# -------------------- Single Report Mode --------------------
 if mode == "📄 Single Report":
     st.title("🤖 Aggregator Prime")
     st.markdown("Upload a PDF and extract pages that contain any of the names listed.")
@@ -55,8 +56,7 @@ if mode == "📄 Single Report":
         with open(output_path, "rb") as f:
             st.download_button("⬇️ Download Result PDF", f, file_name=f"{output_name}.pdf")
 
-# --- BATCH REPORT MODE ---
-
+# -------------------- Batch Reports Mode --------------------
 elif mode == "📚 Batch Reports":
     st.title("📚 Aggregator Prime: Batch Report Generator")
 
@@ -75,6 +75,8 @@ elif mode == "📚 Batch Reports":
         st.session_state.batch_reports[idx]["pdf"] = st.file_uploader(f"Upload PDF for Report {idx+1}", type=["pdf"], key=f"pdf_{idx}")
         st.session_state.batch_reports[idx]["names"] = st.text_area(f"Enter Names for Report {idx+1}", key=f"names_{idx}")
         st.session_state.batch_reports[idx]["output_name"] = st.text_input(f"Output Filename for Report {idx+1}", key=f"name_{idx}")
+
+    generated_files = []  # Store all (name, path) pairs for ZIP
 
     if st.session_state.batch_reports and st.button("🚀 Generate All Reports"):
         for idx, report in enumerate(st.session_state.batch_reports):
@@ -95,8 +97,27 @@ elif mode == "📚 Batch Reports":
 
                 create_pdf_with_pages(temp_source_path, pages, output_path)
 
+                generated_files.append((f"{output_name}.pdf", output_path))
+
                 st.success(f"✅ Report {idx+1} generated with {len(pages)} pages")
                 with open(output_path, "rb") as f:
-                    st.download_button(f"⬇️ Download Report {idx+1}: {output_name}.pdf", f, file_name=f"{output_name}.pdf", key=f"dl_{idx}")
+                    st.download_button(
+                        f"⬇️ Download Report {idx+1}: {output_name}.pdf",
+                        f,
+                        file_name=f"{output_name}.pdf",
+                        key=f"dl_{idx}"
+                    )
             else:
                 st.warning(f"⚠️ Please complete all fields for Report {idx+1}")
+
+        # Create ZIP file
+        if generated_files:
+            zip_name = f"Aggregator-{datetime.now().strftime('%Y-%m-%d')}.zip"
+            zip_path = os.path.join(tempfile.gettempdir(), zip_name)
+
+            with zipfile.ZipFile(zip_path, "w") as zipf:
+                for name, path in generated_files:
+                    zipf.write(path, arcname=name)
+
+            with open(zip_path, "rb") as zf:
+                st.download_button("📦 Download All Reports (ZIP)", zf, file_name=zip_name)
